@@ -52,7 +52,7 @@ pipeline {
                     bat """
                         git config user.email "${GIT_USER_EMAIL}"
                         git config user.name  "${GIT_USER_NAME}"
-                        git remote set-url origin https://%GIT_USER%:%GIT_TOKEN%@github.com/Rohitsss-lab/test.git
+                        git remote set-url origin https://%GIT_USER%:%GIT_TOKEN%@github.com/Rohitsss-lab/test1.git
                         git add VERSION
                         git commit -m "chore: bump version to v${env.NEW_VERSION} [skip ci]"
                         git tag "v${env.NEW_VERSION}"
