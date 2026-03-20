@@ -1,26 +1,14 @@
-import sys
+import sys, re
+from pathlib import Path
 
-with open("VERSION", "r") as f:
-    version = f.read().strip()
-
-major, minor, patch = version.split(".")
-
-# Default bumps patch, but you can pass "minor" or "major" as argument
 bump_type = sys.argv[1] if len(sys.argv) > 1 else "patch"
+version   = Path("VERSION").read_text().strip()
+major, minor, patch = map(int, version.split("."))
 
-if bump_type == "major":
-    major = int(major) + 1
-    minor = 0
-    patch = 0
-elif bump_type == "minor":
-    minor = int(minor) + 1
-    patch = 0
-else:
-    patch = int(patch) + 1
+if bump_type == "major": major += 1; minor = 0; patch = 0
+elif bump_type == "minor": minor += 1; patch = 0
+else: patch += 1
 
 new_version = f"{major}.{minor}.{patch}"
-
-with open("VERSION", "w") as f:
-    f.write(new_version)
-
+Path("VERSION").write_text(new_version)
 print(new_version)
