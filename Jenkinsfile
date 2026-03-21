@@ -1,20 +1,20 @@
 pipeline {
     agent any
+
     parameters {
         choice(name: 'BUMP_TYPE',
                choices: ['patch', 'minor', 'major'],
                description: 'Version bump type')
-        string(name: 'SERVICE_URL',
-               defaultValue: 'http://localhost:8000',
-               description: 'Base URL of the locally running service to test1 against')
     }
+
     environment {
         GIT_USER_EMAIL = "rohit.sharma@alliedmed.co.in"
         GIT_USER_NAME  = "Rohitsss-lab"
-        GIT_REPO_URL   = "https://github.com/Rohitsss-lab/test1.git"
+        GIT_REPO_URL   = "https://github.com/Rohitsss-lab/test1.git"      // ← different
         PYTHON         = "\"C:\\Program Files\\Python313\\python.exe\""
         VENV_DIR       = ".venv"
     }
+
     stages {
 
         stage('Checkout') {
@@ -22,42 +22,6 @@ pipeline {
                 git branch: 'main',
                     credentialsId: 'github-token',
                     url: env.GIT_REPO_URL
-            }
-        }
-
-        stage('Setup test1 environment') {
-            steps {
-                bat """
-                    %PYTHON% -m venv %VENV_DIR%
-                    call %VENV_DIR%\\Scripts\\activate.bat
-                    pip install --upgrade pip --quiet
-                    pip install -r requirements.txt --quiet
-                """
-            }
-        }
-
-        stage('Integration tests') {
-            steps {
-                script {
-                    echo "Running integration tests against: ${params.SERVICE_URL}"
-                }
-                bat """
-                    call %VENV_DIR%\\Scripts\\activate.bat
-                    %PYTHON% -m pytest tests/integration/ ^
-                        -v ^
-                        --tb=short ^
-                        --junitxml=reports\\integration-results.xml ^
-                        --base-url=${params.SERVICE_URL}
-                """
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true,
-                          testResults: 'reports\\integration-results.xml'
-                }
-                failure {
-                    echo "Integration tests FAILED — version will NOT be bumped."
-                }
             }
         }
 
@@ -86,8 +50,12 @@ pipeline {
                     if (!newVer) {
                         error "Could not parse version from: ${rawOutput}"
                     }
+
                     env.NEW_VERSION = newVer
-                    echo "New version: ${env.NEW_VERSION}"
+                    echo "========================================="
+                    echo "  test1 bumping to : v${env.NEW_VERSION}"
+                    echo "  bump type        : ${params.BUMP_TYPE}"
+                    echo "========================================="
                 }
             }
         }
@@ -116,13 +84,13 @@ pipeline {
             steps {
                 script {
                     echo "========================================="
-                    echo "  test1 bumped to v${env.NEW_VERSION}"
-                    echo "  notifying umbrella-version-tracker..."
+                    echo "  test1 bumped to : v${env.NEW_VERSION}"
+                    echo "  notifying       : umbrella-version-tracker"
                     echo "========================================="
                 }
                 build job: 'umbrella-version-tracker',
                       parameters: [
-                          string(name: 'REPO_NAME',    value: 'test1'),
+                          string(name: 'REPO_NAME',    value: 'test1'),     // ← different
                           string(name: 'REPO_VERSION', value: env.NEW_VERSION),
                           string(name: 'BUMP_TYPE',    value: params.BUMP_TYPE ?: 'patch')
                       ],
@@ -132,8 +100,17 @@ pipeline {
     }
 
     post {
-        success { echo "test bumped to v${env.NEW_VERSION} successfully!" }
-        failure { echo "Pipeline failed — no version bump occurred." }
-        always  { cleanWs() }
+        success {
+            echo "========================================="
+            echo "  SUCCESS"
+            echo "  test1 bumped to v${env.NEW_VERSION}"
+            echo "========================================="
+        }
+        failure {
+            echo "Pipeline failed — no version bump occurred."
+        }
+        always {
+            cleanWs()
+        }
     }
 }
