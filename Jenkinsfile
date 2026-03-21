@@ -56,22 +56,24 @@ pipeline {
                           testResults: 'reports\\integration-results.xml'
                 }
                 failure {
-                    echo "Integration tests FAILED — version bump will not run."
+                    echo "Integration tests FAILED — version will NOT be bumped."
                 }
             }
         }
 
         stage('Bump version') {
-            // Only runs if integration tests passed
             steps {
                 script {
                     def currentVersion = readFile('VERSION').trim()
                     echo "Current version: ${currentVersion}"
+
                     def rawOutput = bat(
                         script: "%PYTHON% bump_version.py ${params.BUMP_TYPE ?: 'patch'}",
                         returnStdout: true
                     ).trim()
+
                     echo "Raw bump output: '${rawOutput}'"
+
                     def lines = rawOutput.split('\n')
                     def newVer = ''
                     for (int i = lines.size() - 1; i >= 0; i--) {
@@ -113,7 +115,10 @@ pipeline {
         stage('Notify umbrella') {
             steps {
                 script {
-                    echo "Notifying umbrella → REPO_NAME=test1, REPO_VERSION=${env.NEW_VERSION}"
+                    echo "========================================="
+                    echo "  test1 bumped to v${env.NEW_VERSION}"
+                    echo "  notifying umbrella-version-tracker..."
+                    echo "========================================="
                 }
                 build job: 'umbrella-version-tracker',
                       parameters: [
@@ -127,7 +132,7 @@ pipeline {
     }
 
     post {
-        success { echo "test1 bumped to v${env.NEW_VERSION} successfully!" }
+        success { echo "test bumped to v${env.NEW_VERSION} successfully!" }
         failure { echo "Pipeline failed — no version bump occurred." }
         always  { cleanWs() }
     }
