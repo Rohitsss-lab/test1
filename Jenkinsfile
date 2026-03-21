@@ -1,19 +1,22 @@
 pipeline {
     agent any
-
     parameters {
         choice(name: 'BUMP_TYPE',
                choices: ['patch', 'minor', 'major'],
                description: 'Version bump type')
+        string(name: 'SERVICE_URL',
+               defaultValue: 'http://localhost:8000',
+               description: 'Base URL of the locally running service to test1 against')
     }
-
     environment {
         GIT_USER_EMAIL = "rohit.sharma@alliedmed.co.in"
         GIT_USER_NAME  = "Rohitsss-lab"
         GIT_REPO_URL   = "https://github.com/Rohitsss-lab/test1.git"
+        PYTHON         = "\"C:\\Program Files\\Python313\\python.exe\""
+        VENV_DIR       = ".venv"
     }
-
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'main',
@@ -22,20 +25,53 @@ pipeline {
             }
         }
 
+        stage('Setup test1 environment') {
+            steps {
+                bat """
+                    %PYTHON% -m venv %VENV_DIR%
+                    call %VENV_DIR%\\Scripts\\activate.bat
+                    pip install --upgrade pip --quiet
+                    pip install -r requirements.txt --quiet
+                """
+            }
+        }
+
+        stage('Integration tests') {
+            steps {
+                script {
+                    echo "Running integration tests against: ${params.SERVICE_URL}"
+                }
+                bat """
+                    call %VENV_DIR%\\Scripts\\activate.bat
+                    %PYTHON% -m pytest tests/integration/ ^
+                        -v ^
+                        --tb=short ^
+                        --junitxml=reports\\integration-results.xml ^
+                        --base-url=${params.SERVICE_URL}
+                """
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true,
+                          testResults: 'reports\\integration-results.xml'
+                }
+                failure {
+                    echo "Integration tests FAILED — version bump will not run."
+                }
+            }
+        }
+
         stage('Bump version') {
+            // Only runs if integration tests passed
             steps {
                 script {
                     def currentVersion = readFile('VERSION').trim()
                     echo "Current version: ${currentVersion}"
-
                     def rawOutput = bat(
-                        script: "\"C:\\Program Files\\Python313\\python.exe\" bump_version.py ${params.BUMP_TYPE ?: 'patch'}",
+                        script: "%PYTHON% bump_version.py ${params.BUMP_TYPE ?: 'patch'}",
                         returnStdout: true
                     ).trim()
-
                     echo "Raw bump output: '${rawOutput}'"
-
-                    // Find version number in output — scan from last line upward
                     def lines = rawOutput.split('\n')
                     def newVer = ''
                     for (int i = lines.size() - 1; i >= 0; i--) {
@@ -45,11 +81,9 @@ pipeline {
                             break
                         }
                     }
-
                     if (!newVer) {
                         error "Could not parse version from: ${rawOutput}"
                     }
-
                     env.NEW_VERSION = newVer
                     echo "New version: ${env.NEW_VERSION}"
                 }
@@ -94,6 +128,7 @@ pipeline {
 
     post {
         success { echo "test1 bumped to v${env.NEW_VERSION} successfully!" }
-        failure { echo "Pipeline failed for test1" }
+        failure { echo "Pipeline failed — no version bump occurred." }
+        always  { cleanWs() }
     }
 }
