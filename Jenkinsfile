@@ -8,7 +8,6 @@ pipeline {
     }
 
     environment {
-        REPO_NAME      = "test1"
         GIT_USER_EMAIL = "rohit.sharma@alliedmed.co.in"
         GIT_USER_NAME  = "Rohitsss-lab"
         GIT_REPO_URL   = "https://github.com/Rohitsss-lab/test1.git"
@@ -29,14 +28,29 @@ pipeline {
                     def currentVersion = readFile('VERSION').trim()
                     echo "Current version: ${currentVersion}"
 
-                    def bumpType   = params.BUMP_TYPE ?: 'patch'
-                    def pythonPath = '"C:\\Program Files\\Python313\\python.exe"'
-
-                    env.NEW_VERSION = bat(
-                        script: "${pythonPath} bump_version.py ${bumpType}",
+                    def rawOutput = bat(
+                        script: "\"C:\\Program Files\\Python313\\python.exe\" bump_version.py ${params.BUMP_TYPE ?: 'patch'}",
                         returnStdout: true
-                    ).trim().readLines().last()
+                    ).trim()
 
+                    echo "Raw bump output: '${rawOutput}'"
+
+                    // Find version number in output — scan from last line upward
+                    def lines = rawOutput.split('\n')
+                    def newVer = ''
+                    for (int i = lines.size() - 1; i >= 0; i--) {
+                        def l = lines[i].trim().replaceAll('\r', '')
+                        if (l.matches('[0-9]+\\.[0-9]+\\.[0-9]+')) {
+                            newVer = l
+                            break
+                        }
+                    }
+
+                    if (!newVer) {
+                        error "Could not parse version from: ${rawOutput}"
+                    }
+
+                    env.NEW_VERSION = newVer
                     echo "New version: ${env.NEW_VERSION}"
                 }
             }
@@ -64,9 +78,12 @@ pipeline {
 
         stage('Notify umbrella') {
             steps {
+                script {
+                    echo "Notifying umbrella → REPO_NAME=test1, REPO_VERSION=${env.NEW_VERSION}"
+                }
                 build job: 'umbrella-version-tracker',
                       parameters: [
-                          string(name: 'REPO_NAME',    value: env.REPO_NAME),
+                          string(name: 'REPO_NAME',    value: 'test1'),
                           string(name: 'REPO_VERSION', value: env.NEW_VERSION),
                           string(name: 'BUMP_TYPE',    value: params.BUMP_TYPE ?: 'patch')
                       ],
@@ -76,7 +93,7 @@ pipeline {
     }
 
     post {
-        success { echo "test bumped to v${env.NEW_VERSION} successfully!" }
-        failure { echo "Pipeline failed for test" }
+        success { echo "test1 bumped to v${env.NEW_VERSION} successfully!" }
+        failure { echo "Pipeline failed for test1" }
     }
 }
