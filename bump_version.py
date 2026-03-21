@@ -1,5 +1,4 @@
 import sys
-import re
 
 def bump_version(version: str, part: str = "patch") -> str:
     major, minor, patch = map(int, version.strip().split("."))
@@ -31,14 +30,14 @@ def bump_version(version: str, part: str = "patch") -> str:
 
 
 if __name__ == "__main__":
-    version_file = sys.argv[1]  # e.g. "version.txt"
-    part = sys.argv[2] if len(sys.argv) > 2 else "patch"
+    bump_type = sys.argv[1] if len(sys.argv) > 1 else "patch"
 
-    with open(version_file) as f:
+    with open("VERSION") as f:
         current = f.read().strip()
 
-    new_version = bump_version(current, part)
-    print(f"Bumping {current} → {new_version}")
+    new_version = bump_version(current, bump_type)
 
-    with open(version_file, "w") as f:
+    with open("VERSION", "w") as f:
         f.write(new_version + "\n")
+
+    print(new_version)
